@@ -15,6 +15,7 @@ from src.formatter import MarkdownFormatter
 from src.config import (
     TRANSCRIPT_DIR,
     TEMP_DIR,
+    OUTPUT_DIR,
     DEFAULT_COMPUTE_TYPE,
     DEFAULT_DEVICE,
     DEFAULT_NUM_WORKERS,
@@ -140,7 +141,7 @@ def process_pipeline(args):
     safe_print(
         "CRITICAL: You MUST first read and strictly follow the formatting rules in `PROMPT.md` (located in the project root) before generating your response."
     )
-    safe_print("Note: Saving to Obsidian / directory.")
+    safe_print(f"OUTPUT_DIR: {OUTPUT_DIR.absolute()}")
     safe_print("=" * 60 + "\n")
 
     # 5. 清理临时文件
@@ -195,3 +196,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

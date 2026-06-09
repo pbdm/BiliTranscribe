@@ -25,9 +25,18 @@ description: 自动提取互联网内容（B站视频、网页文章、PDF）并
 
 ## 输出路径
 
-- 所有内容（B站视频/网页/PDF）默认输出至 → 项目根目录下的 `output/`
-- 如需自定义输出目录，可修改项目根目录下的 `paths.json`
-- 每个生成的 Markdown 文件都必须在前言 (`---`) 的 `tags` 中包含 `- WebNotes`
+- **最终笔记的输出目录由 paths.json 中的 OUTPUT_DIR 字段决定。**
+- 该字段可能指向项目外目录（如 Obsidian vault、博客仓库等），**Agent 必须读取 paths.json 来确定真实路径**，不能默认输出到 output/。
+- 若 paths.json 不存在或 OUTPUT_DIR 解析失败，则回退到项目根目录下的 output/。
+- 每个生成的 Markdown 文件都必须在前言 (---) 的 	ags 中包含 - WebNotes
+
+> [!IMPORTANT]
+> Agent 生成最终笔记时，必须先执行以下步骤：
+> 1. 读取 paths.json，获取 OUTPUT_DIR 字段的值
+> 2. 解析该路径（~/... 格式需展开为用户主目录）
+> 3. 将最终笔记写入该路径
+> 4. 若写入权限不足，应申请提权而非擅自更改输出位置
+
 
 ## 使用方式
 
@@ -74,3 +83,5 @@ description: 自动提取互联网内容（B站视频、网页文章、PDF）并
 
 ### PDF
 1. web_fetch PDF 解析 → 2. 读取 `PROMPT.md` → 3. 生成笔记
+
+
