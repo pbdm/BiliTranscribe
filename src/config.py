@@ -70,20 +70,79 @@ except Exception as e:
     print(f"WARNING: Cannot create OUTPUT_DIR: {e}")
 
 
-# 模型配置
+# ──────────────────────────────────────────────
+# NVIDIA CUDA DLL 路径自动加载（Windows）
+# 确保 ctranslate2 / faster-whisper 能找到 cublas/cudnn
+# ──────────────────────────────────────────────
+def _add_nvidia_dll_paths():
+    """将 pip 安装的 nvidia-* package 中的 DLL 目录加入 PATH。"""
+    added = []
+    for site_pkg in sys.path:
+        nv_root = Path(site_pkg) / "nvidia"
+        if not nv_root.is_dir():
+            continue
+        for pkg_dir in nv_root.iterdir():
+            bin_path = pkg_dir / "bin"
+            if bin_path.is_dir():
+                resolved = str(bin_path.resolve())
+                if resolved not in os.environ.get("PATH", ""):
+                    os.environ["PATH"] = resolved + os.pathsep + os.environ.get("PATH", "")
+                added.append(resolved)
+    return added
+
+
+_added_nvidia_dlls = _add_nvidia_dll_paths()
+
+
+# ──────────────────────────────────────────────
+# 硬件检测
+# ──────────────────────────────────────────────
+def _has_cuda():
+    """检测 CUDA 是否可用（不依赖 PyTorch）。"""
+    if os.name != "nt":
+        return False
+    # 尝试加载 cublas（只要有这个，CUDA 就可用）
+    try:
+        import ctypes
+        ctypes.CDLL("nvcuda.dll")  # 由 NVIDIA 驱动提供
+        # 如果能找到 cublas DLL，说明运行时也已就位
+        for dll_name in ("cublas64_12.dll", "cublasLt64_12.dll"):
+            try:
+                ctypes.CDLL(dll_name)
+                return True
+            except OSError:
+                continue
+        # 回退：在 nvidia package 目录里找
+        for site_pkg in sys.path:
+            candidate = Path(site_pkg) / "nvidia" / "cublas" / "bin" / "cublas64_12.dll"
+            if candidate.exists():
+                try:
+                    ctypes.CDLL(str(candidate))
+                    return True
+                except OSError:
+                    continue
+        return False
+    except Exception:
+        return False
+
+
 def get_default_device():
+    # 优先用 PyTorch 检测
     try:
         import torch
-
         return "cuda" if torch.cuda.is_available() else "cpu"
     except ImportError:
-        return "cpu"
+        pass
+
+    if _has_cuda():
+        return "cuda"
+    return "cpu"
 
 
 DEFAULT_DEVICE = get_default_device()
 DEFAULT_COMPUTE_TYPE = "float16" if DEFAULT_DEVICE == "cuda" else "int8"
 DEFAULT_MODEL_SIZE = "large-v3" if DEFAULT_DEVICE == "cuda" else "base"
-DEFAULT_NUM_WORKERS = 2 if DEFAULT_DEVICE == "cuda" else 4
+DEFAULT_NUM_WORKERS = 1 if DEFAULT_DEVICE == "cuda" else 4
 
 print(
     f"DEBUG: Hardware detected: {DEFAULT_DEVICE} on {sys.platform}, using compute_type: {DEFAULT_COMPUTE_TYPE}"
