@@ -88,6 +88,16 @@ def _add_nvidia_dll_paths():
                 if resolved not in os.environ.get("PATH", ""):
                     os.environ["PATH"] = resolved + os.pathsep + os.environ.get("PATH", "")
                 added.append(resolved)
+    # 补充 python-embed 目录（本地 CUDA 运行时）
+    python_embed = PROJECT_ROOT / "python-embed"
+    if python_embed.is_dir():
+        for pkg_dir in (python_embed / "Lib" / "site-packages" / "nvidia").iterdir():
+            bin_path = pkg_dir / "bin"
+            if bin_path.is_dir():
+                resolved = str(bin_path.resolve())
+                if resolved not in os.environ.get("PATH", ""):
+                    os.environ["PATH"] = resolved + os.pathsep + os.environ.get("PATH", "")
+                added.append(resolved)
     return added
 
 
@@ -113,8 +123,10 @@ def _has_cuda():
             except OSError:
                 continue
         # 回退：在 nvidia package 目录里找
-        for site_pkg in sys.path:
-            candidate = Path(site_pkg) / "nvidia" / "cublas" / "bin" / "cublas64_12.dll"
+        # 拉长搜索路径：同时搜 sys.path 和 python-embed
+        search_roots = list(sys.path) + [str(PROJECT_ROOT / "python-embed" / "Lib" / "site-packages")]
+        for root in search_roots:
+            candidate = Path(root) / "nvidia" / "cublas" / "bin" / "cublas64_12.dll"
             if candidate.exists():
                 try:
                     ctypes.CDLL(str(candidate))

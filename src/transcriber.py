@@ -66,7 +66,14 @@ class Transcriber:
         logger.info(f"⏳ Total audio duration: {info.duration:.2f}s")
         
         # 实时进度条：以音频秒数为单位
-        pbar = tqdm(total=round(info.duration, 2), unit="s", desc="Transcription Progress", leave=True)
+        # ascii=True 使用 ASCII 字符避免 Windows 终端乱码
+        pbar = tqdm(
+            total=round(info.duration, 2),
+            unit="s",
+            desc="Transcription Progress",
+            leave=True,
+            ascii=True,
+        )
         
         segments = []
         last_end = 0
