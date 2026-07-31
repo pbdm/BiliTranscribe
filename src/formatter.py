@@ -23,6 +23,7 @@ class MarkdownFormatter:
             f.write(f"published: {upload_date}\n")
             f.write(f"source: {source_url}\n")
             f.write(f"author: {uploader}\n")
+            f.write("publish: false\n")
             f.write("tags:\n  - transcript\n  - inbox\n")
             f.write("---\n\n")
             

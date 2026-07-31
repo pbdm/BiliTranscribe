@@ -1,5 +1,7 @@
 import json
 import re
+import ssl
+import time
 import yt_dlp
 from pathlib import Path
 from urllib.request import urlopen, Request
@@ -57,7 +59,14 @@ class VideoDownloader:
 
         try:
             req = Request(api_url, headers=headers)
-            with urlopen(req, timeout=10) as response:
+            try:
+                response = urlopen(req, timeout=10)
+            except Exception:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                response = urlopen(req, timeout=10, context=ctx)
+            with response:
                 data = json.loads(response.read().decode())
                 if data.get("code") == 0:
                     return data.get("data")
@@ -76,7 +85,14 @@ class VideoDownloader:
 
         try:
             req = Request(api_url, headers=headers)
-            with urlopen(req, timeout=15) as response:
+            try:
+                response = urlopen(req, timeout=15)
+            except Exception:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                response = urlopen(req, timeout=15, context=ctx)
+            with response:
                 data = json.loads(response.read().decode())
                 if data.get("code") == 0:
                     return data.get("data", {})
@@ -84,7 +100,7 @@ class VideoDownloader:
             logger.warning(f"PlayURL API failed: {e}")
         return None
 
-    def _download_url(self, url: str, output_path: Path):
+    def _download_url(self, url: str, output_path: Path, max_retries: int = 3):
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Referer": "https://www.bilibili.com/",
@@ -92,22 +108,43 @@ class VideoDownloader:
         if self.cookie_header:
             headers["Cookie"] = self.cookie_header
 
-        req = Request(url, headers=headers)
-        with urlopen(req, timeout=60) as response:
-            with open(output_path, "wb") as f:
-                total = int(response.headers.get("Content-Length", 0))
-                downloaded = 0
-                chunk_size = 8192
-                while True:
-                    chunk = response.read(chunk_size)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if total:
-                        pct = downloaded * 100 // total
-                        if downloaded % (chunk_size * 50) == 0:
-                            logger.info(f"  📥 {pct}%")
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                req = Request(url, headers=headers)
+                # Try with SSL verification first, fallback to unverified
+                try:
+                    response = urlopen(req, timeout=600)
+                except Exception:
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    response = urlopen(req, timeout=600, context=ctx)
+
+                with response, open(output_path, "wb") as f:
+                    total = int(response.headers.get("Content-Length", 0))
+                    downloaded = 0
+                    chunk_size = 8192
+                    while True:
+                        chunk = response.read(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total:
+                            pct = downloaded * 100 // total
+                            if downloaded % (chunk_size * 50) == 0:
+                                logger.info(f"  📥 {pct}%")
+                return  # success
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    wait = 5 * (attempt + 1)
+                    logger.warning(f"  ⚠️ Download attempt {attempt+1} failed: {e}, retrying in {wait}s...")
+                    time.sleep(wait)
+                    # Re-download from scratch (could add range header for resume)
+                else:
+                    raise last_error
 
     def extract_info(self, url: str):
         try:
