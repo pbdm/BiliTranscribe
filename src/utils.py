@@ -1,5 +1,6 @@
 import time
 import functools
+from datetime import datetime
 from .logger import logger
 
 
@@ -28,6 +29,11 @@ def sanitize_filename(title: str, max_length: int = 100) -> str:
     if len(safe) > max_length:
         safe = safe[:max_length]
     return safe or "untitled"
+
+
+def today_str() -> str:
+    """返回今天的日期字符串 (YYYY-MM-DD)，用于博客笔记的 pubDate。"""
+    return datetime.now().strftime("%Y-%m-%d")
 
 
 def time_it(func):
